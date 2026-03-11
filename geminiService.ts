@@ -15,7 +15,7 @@ export const generateTravelThemes = async (categories?: string[], selectedCharac
 
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `현실의 일상을 특별한 여행지로 재해석하는 10가지 감성적인 주제를 생성해줘. 'Warm Documentary' 감성이자 시네마틱한 분위기여야 해. ${categoryPrompt} ${characterPrompt}`,
+    contents: `반드시 한국어로만 응답해줘. 현실의 일상을 특별한 여행지로 재해석하는 10가지 감성적인 주제를 생성해줘. title과 description 모두 반드시 한국어로 작성해. 'Warm Documentary' 감성이자 시네마틱한 분위기여야 해. ${categoryPrompt} ${characterPrompt}`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
