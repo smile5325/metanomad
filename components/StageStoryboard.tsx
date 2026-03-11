@@ -64,102 +64,147 @@ const StageStoryboard: React.FC<Props> = ({ theme, scenes, storyDetails, onNext,
     const format = storyDetails?.format || '1인 독백';
     const isMulti = format.includes('2인');
 
-    const totalDuration = scenes.reduce((acc, s) => {
-      const dur = isMulti ? Math.floor((s.narrationKOR || "").length / 4) : Math.floor((s.narrationKOR || "").length / 5);
-      return acc + dur;
-    }, 0);
+    // ── Sync 계산 헬퍼 ──────────────────────────────────────
+    const calcSync = (s: Scene) => {
+      const narDuration = isMulti
+        ? Math.floor((s.narrationKOR || '').length / 4)
+        : Math.floor((s.narrationKOR || '').length / 5);
+      const imageCount = s.imagePromptsENG?.length || 0;
+      const imageCover = imageCount * 7;
+      const syncGap = narDuration - imageCover;
+      return { narDuration, imageCount, imageCover, syncGap };
+    };
 
+    const totalDuration = scenes.reduce((acc, s) => acc + calcSync(s).narDuration, 0);
     const minutes = Math.floor(totalDuration / 60);
     const seconds = totalDuration % 60;
 
-    // --- Sheet 1: 📋 스토리 요약 ---
+    // ══════════════════════════════════════════════════════
+    // Sheet 1: 📋 스토리 요약
+    // ══════════════════════════════════════════════════════
     const ws1Data: any[][] = [];
-    // Row 1: Title
     ws1Data.push([`📺 ${title} — 스토리텔링 대본 요약`]);
-    ws1Data.push([]); // Row 2
-
-    // Row 3: ■ 프로젝트 요약
-    ws1Data.push(["■ 프로젝트 요약"]);
-    
-    // Row 4-9: Key-value
-    ws1Data.push(["주제", title]);
-    ws1Data.push(["총 씬 수", `${scenes.length}개`]);
-    ws1Data.push(["예상 러닝타임", `약 ${minutes}분 ${seconds}초`]);
-    ws1Data.push(["스토리 구조", "기(4) → 승(6) → 전(6) → 결(4)"]);
-    ws1Data.push(["나레이션 형식", isMulti ? "2인 대화형 (캐릭터1 ↔ 캐릭터2)" : "1인 3인칭 나레이션"]);
-    ws1Data.push(["영상 스타일", storyDetails?.style || "Warm Documentary"]);
-    ws1Data.push([]); // Row 10
-
-    // Row 11: ■ 전체 스토리 임팩트 요약
-    ws1Data.push(["■ 전체 스토리 임팩트 요약"]);
-    
-    // Row 12: Intro Impact
-    const firstSceneNar = scenes[0]?.narrationKOR || "";
-    const coreEmotion = theme.category || "일상";
-    const impactText = `[${coreEmotion}] — 캐릭터들이 발견한 것은 ${firstSceneNar.slice(0, 30)}... 였다.`;
-    ws1Data.push([impactText]);
-    
-    // Row 13-16: ACT summaries
-    const getActSummary = (startIdx: number) => {
-      const s = scenes[startIdx];
-      return s ? (s.narrationKOR || "").slice(0, 100) : "";
-    };
-    ws1Data.push(["기 (Hook)", getActSummary(0)]);
-    ws1Data.push(["승 (Build-up)", getActSummary(4)]);
-    ws1Data.push(["전 (Climax)", getActSummary(10)]);
-    ws1Data.push(["결 (Outro)", getActSummary(16)]);
-    ws1Data.push([]); // Row 17
-
-    // Row 18: ■ 기승전결 씬별 요약
-    ws1Data.push(["■ 기승전결 씬별 요약"]);
-    
-    // Row 19: Headers
-    ws1Data.push(["씬", "Stage", "장소", "나레이션 요약"]);
-
-    // Row 20+: Data
+    ws1Data.push([]);
+    ws1Data.push(['■ 프로젝트 요약']);
+    ws1Data.push(['주제', title]);
+    ws1Data.push(['총 씬 수', `${scenes.length}개`]);
+    ws1Data.push(['예상 러닝타임', `약 ${minutes}분 ${seconds}초`]);
+    ws1Data.push(['스토리 구조', '기(4) → 승(6) → 전(6) → 결(4)']);
+    ws1Data.push(['나레이션 형식', isMulti ? '2인 대화형 (캐릭터1 ↔ 캐릭터2)' : '1인 3인칭 나레이션']);
+    ws1Data.push(['영상 스타일', storyDetails?.style || 'Warm Documentary']);
+    ws1Data.push([]);
+    ws1Data.push(['■ 전체 스토리 임팩트 요약']);
+    const coreEmotion = theme.category || '일상';
+    const firstNar = scenes[0]?.narrationKOR || '';
+    ws1Data.push([`[${coreEmotion}] — 캐릭터들이 발견한 것은 ${firstNar.slice(0, 30)}... 였다.`]);
+    ws1Data.push(['기 (Hook)',    (scenes[0]?.narrationKOR  || '').slice(0, 100)]);
+    ws1Data.push(['승 (Build-up)',(scenes[4]?.narrationKOR  || '').slice(0, 100)]);
+    ws1Data.push(['전 (Climax)', (scenes[10]?.narrationKOR || '').slice(0, 100)]);
+    ws1Data.push(['결 (Outro)',   (scenes[16]?.narrationKOR || '').slice(0, 100)]);
+    ws1Data.push([]);
+    ws1Data.push(['■ 기승전결 씬별 요약']);
+    ws1Data.push(['씬', 'Stage', '장소', '나레이션 요약']);
     scenes.forEach((s, idx) => {
-      if (idx === 0) ws1Data.push(["🎬 기 (Hook) — 시선을 끄는 오프닝"]);
-      else if (idx === 4) ws1Data.push(["🚶 승 (Build-up) — 여정의 깊이"]);
-      else if (idx === 10) ws1Data.push(["💡 전 (Climax) — 반전과 깨달음"]);
-      else if (idx === 16) ws1Data.push(["🌅 결 (Outro) — 감성 마무리 & CTA"]);
-      
-      ws1Data.push([
-        s.number,
-        s.stage,
-        s.placeName || "",
-        (s.narrationKOR || "").slice(0, 120) + "..."
-      ]);
+      if (idx === 0)  ws1Data.push(['🎬 기 (Hook) — 시선을 끄는 오프닝']);
+      if (idx === 4)  ws1Data.push(['🚶 승 (Build-up) — 여정의 깊이']);
+      if (idx === 10) ws1Data.push(['💡 전 (Climax) — 반전과 깨달음']);
+      if (idx === 16) ws1Data.push(['🌅 결 (Outro) — 감성 마무리 & CTA']);
+      ws1Data.push([s.number, s.stage, s.placeName || '', (s.narrationKOR || '').slice(0, 120) + '...']);
     });
-
     const ws1 = XLSX.utils.aoa_to_sheet(ws1Data);
-    ws1['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 22 }, { wch: 60 }];
+    ws1['!cols'] = [{ wch: 18 }, { wch: 52 }, { wch: 20 }, { wch: 20 }];
 
-    // --- Sheet 2: 📖 전체 스토리텔링 대본 ---
+    // ══════════════════════════════════════════════════════
+    // Sheet 2: 📖 전체 스토리텔링 대본 (이야기 서술형)
+    // ══════════════════════════════════════════════════════
     const ws2Data: any[][] = [];
     ws2Data.push([`📖 ${title} — 전체 스토리텔링 대본`]);
-    ws2Data.push(["씬", "Stage", "장소", "나레이션(KOR)", "이미지 프롬프트(KOR)", "이미지 프롬프트(ENG)"]);
-
+    const stageHdrs: Record<number, string> = {
+      0:  '🎬 기 (Hook) — 시선을 끄는 오프닝',
+      4:  '🚶 승 (Build-up) — 여정의 깊이',
+      10: '💡 전 (Climax) — 반전과 깨달음',
+      16: '🌅 결 (Outro) — 감성 마무리 & CTA',
+    };
     scenes.forEach((s, idx) => {
-      if (idx === 0) ws2Data.push(["🎬 기 (Hook) — 시선을 끄는 오프닝"]);
-      else if (idx === 4) ws2Data.push(["🚶 승 (Build-up) — 여정의 깊이"]);
-      else if (idx === 10) ws2Data.push(["💡 전 (Climax) — 반전과 깨달음"]);
-      else if (idx === 16) ws2Data.push(["🌅 결 (Outro) — 감성 마무리 & CTA"]);
+      if (stageHdrs[idx]) ws2Data.push([stageHdrs[idx]]);
+      ws2Data.push([`씬 ${s.number}`, s.placeName || '']);
+      ws2Data.push(['', s.narrationKOR || '']);
+      ws2Data.push([]);
+    });
+    const ws2 = XLSX.utils.aoa_to_sheet(ws2Data);
+    ws2['!cols'] = [{ wch: 10 }, { wch: 22 }, { wch: 95 }];
 
-      ws2Data.push([
-        s.number,
-        s.stage,
-        s.placeName || "",
-        s.narrationKOR || "",
-        s.imagePromptsKOR?.join('\n') || "",
-        s.imagePromptsENG?.join('\n') || ""
+    // ══════════════════════════════════════════════════════
+    // Sheet 3: 🎬 스토리보드 (Sync 4열 포함)
+    // ══════════════════════════════════════════════════════
+    const ws3Data: any[][] = [];
+    ws3Data.push([`🎬 ${title} — 스토리보드`]);
+    ws3Data.push([
+      '#', 'Stage', 'Place',
+      'Narration\nDuration(sec)', 'Image\nCount', 'Image Cover\n(sec)', 'Sync Gap\n(sec)',
+      'Narration (KOR)', 'Narration (ENG)',
+      'SFX (KOR)', 'SFX (ENG)',
+      'Image Prompts (KOR)', 'Image Prompts (ENG)',
+      'Video Prompts (KOR)', 'Video Prompts (ENG)',
+    ]);
+    scenes.forEach(s => {
+      const { narDuration, imageCount, imageCover, syncGap } = calcSync(s);
+      ws3Data.push([
+        s.number, s.stage, s.placeName || '',
+        narDuration, imageCount, imageCover, syncGap,
+        s.narrationKOR || '', s.narrationENG || '',
+        s.sfxKOR || '', s.sfxENG || '',
+        s.imagePromptsKOR?.join(' | ') || '',
+        s.imagePromptsENG?.join(' | ') || '',
+        s.videoPromptKOR || '', s.videoPromptENG || '',
       ]);
     });
+    const ws3 = XLSX.utils.aoa_to_sheet(ws3Data);
+    ws3['!cols'] = [
+      { wch: 4 }, { wch: 11 }, { wch: 16 },
+      { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 9 },
+      { wch: 40 }, { wch: 40 },
+      { wch: 14 }, { wch: 14 },
+      { wch: 48 }, { wch: 55 },
+      { wch: 32 }, { wch: 32 },
+    ];
 
-    const ws2 = XLSX.utils.aoa_to_sheet(ws2Data);
-    ws2['!cols'] = [{ wch: 5 }, { wch: 13 }, { wch: 18 }, { wch: 55 }, { wch: 40 }, { wch: 40 }];
+    // ══════════════════════════════════════════════════════
+    // Sheet 4: 📤 Grok 프롬프트 출력 (1컷 1행 + 컷 사이 빈행)
+    // ══════════════════════════════════════════════════════
+    const ws4Data: any[][] = [];
+    ws4Data.push(['📤 Grok Automation 이미지 프롬프트 — 씬별 / 1컷 1행 / 컷 사이 빈행 / Grok 복붙용']);
+    ws4Data.push([
+      '#', 'Stage', 'Image\nCount', 'Narr\nDur(sec)', 'Image\nCover(sec)', 'Sync\nGap(sec)',
+      'Image Prompt (ENG) — 1컷 1행, 컷 사이 빈행 → Grok 복붙용',
+    ]);
+    scenes.forEach(s => {
+      const { narDuration, imageCount, imageCover, syncGap } = calcSync(s);
+      const prompts = s.imagePromptsENG || [];
+      prompts.forEach((prompt, pi) => {
+        ws4Data.push([
+          pi === 0 ? s.number    : '',
+          pi === 0 ? s.stage     : '',
+          pi === 0 ? imageCount  : '',
+          pi === 0 ? narDuration : '',
+          pi === 0 ? imageCover  : '',
+          pi === 0 ? syncGap     : '',
+          prompt,
+        ]);
+        if (pi < prompts.length - 1) {
+          ws4Data.push(['', '', '', '', '', '', '']); // 컷 사이 빈행
+        }
+      });
+      ws4Data.push([]); // 씬 사이 빈행
+    });
+    const ws4 = XLSX.utils.aoa_to_sheet(ws4Data);
+    ws4['!cols'] = [{ wch: 4 }, { wch: 12 }, { wch: 8 }, { wch: 11 }, { wch: 10 }, { wch: 9 }, { wch: 88 }];
 
-    XLSX.utils.book_append_sheet(wb, ws1, "📋 스토리 요약");
-    XLSX.utils.book_append_sheet(wb, ws2, "📖 전체 스토리텔링 대본");
+    // ── 시트 등록 & 저장 ────────────────────────────────────
+    XLSX.utils.book_append_sheet(wb, ws1, '📋 스토리 요약');
+    XLSX.utils.book_append_sheet(wb, ws2, '📖 전체 스토리텔링 대본');
+    XLSX.utils.book_append_sheet(wb, ws3, '🎬 스토리보드');
+    XLSX.utils.book_append_sheet(wb, ws4, '📤 Grok 프롬프트 출력');
 
     const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const safeTitle = (theme.title || '').replace(/[^a-zA-Z0-9가-힣\s]/g, '').replace(/\s+/g, '_').slice(0, 20) || 'MetaNomad';
