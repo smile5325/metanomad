@@ -7,8 +7,7 @@ interface Props {
   theme: TravelTheme;
   scenes: Scene[];
   storyDetails?: { style: string, reason: string, format?: string } | null;
-  onNext: () => void;
-  onBack: () => void;
+  onNext: () => void;   onBack: () => void;
 }
 
 type ExportType = 'image' | 'narration' | 'sfx';
