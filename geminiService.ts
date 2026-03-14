@@ -131,6 +131,30 @@ export const generateStoryArc = async (
 
     const storyStructureRules = `\n\nSTORY STRUCTURE RULES:\nDivide 20 scenes into 4 acts:\n\nACT 1 - Hook (scenes 1~4):\nStart with the most visually striking moment.\nOpen with a philosophical question to create empathy.\nClearly present today's destination and journey purpose.\nMake viewers feel they must watch till the end.\nscene 1 Image Prompt MUST start with:\ncamera viewfinder UI overlay,\nfocus brackets, exposure meter display,\nPOV through lens effect,\n[then continue with scene description]\n\nACT 2 - Journey (scenes 5~10):\nConvey sensory experience: sounds, smells, colors.\nLayer in local history and cultural context naturally.\nShow gradual emotional change of the character.\nInsert 1 IT metaphor naturally:\n(logout / sync / reboot / offline cache / sleep mode)\n\nACT 3 - Twist (scenes 11~16):\nReveal an unexpected discovery or realization.\nShow something different from expectations.\nConnect to MetaNomad philosophy:\n'Every alley is a destination'\nBuild emotional tension or a touching moment.\n\nACT 4 - Resolution (scenes 17~20):\nscenes 17~18: Emotional wrap-up using sunset or night scenery.\nscene 19: Leave a philosophical message as lingering emotion.\nscene 20: CTA only - encourage comments with a question.\nNO preview of next journey.\n\nAlways reflect the selected city and theme characteristics.
 
+RUNNING TIME CONTROL (CRITICAL):
+- Target total running time: 15~18 minutes (900~1080 seconds)
+- Each scene narration: MAX 200~300 Korean characters (60~80 seconds)
+- Do NOT exceed 300 characters per scene narration under any circumstances
+- Dialogue scenes (2-person): each character speaks MAX 2 lines per scene
+- This limit is ABSOLUTE - shorter narration = better pacing
+
+ANTI-REPETITION RULES (CRITICAL):
+- Each scene MUST have a UNIQUE placeName. NO two scenes can share the same location.
+- Walking-together shots are allowed MAX ONCE per act (max 4 total across all 20 scenes).
+- The phrase or action "두 사람이 걷는다 / walking together / walking side by side" 
+  may appear in videoPromptKOR/ENG MAX ONCE per act.
+- FORBIDDEN repeated patterns across scenes:
+  * Do NOT repeat: "두 사람이 골목을 걷는다" more than once per act
+  * Do NOT repeat: wide back-view walking shots in consecutive scenes
+  * Do NOT repeat: the same sensory focus (e.g., smell/coffee) in adjacent scenes
+  * Do NOT generate multiple scenes with the same background type (e.g., two "narrow alley" scenes back-to-back)
+- Each act must cover DIFFERENT location types:
+  * Act 1: entrance/architecture/historical artifact/clothing
+  * Act 2: cafe/visual art spot/quiet alley/scent/food
+  * Act 3: getting lost/hidden everyday life/small discovery/emotional realization/open sky
+  * Act 4: rooftop/night alley/gate/farewell
+- Scene topics within the same act must NOT overlap in theme or visual content.
+
 STORY TYPE AUTO-DETECTION:
 
 First, analyze the topic title and
@@ -196,11 +220,13 @@ TYPE B - Event/Emotion Based Strategy:
       const chunkResults = await Promise.all(
         chunk.map(async (scene) => {
           const textLength = (scene.narrationKOR || '').length;
-          const calculatedCount = format === '2인 대화'
-            ? Math.ceil(textLength / 4 / 7)
-            : Math.ceil(textLength / 5 / 7);
-          
-          const imageCount = Math.max(3, calculatedCount);
+          // Sync 기준: 한글 1자 ≈ 0.2초(2인대화) / 0.17초(1인), 이미지 1컷 = 8초
+          // imageCount = ceil(narrDuration / 8), 범위: 최소 4, 최대 8
+          const narrDurationSec = format === '2인 대화'
+            ? textLength * 0.20
+            : textLength * 0.17;
+          const calculatedCount = Math.ceil(narrDurationSec / 8);
+          const imageCount = Math.min(8, Math.max(4, calculatedCount));
 
           const images = await generateImagePrompts(
             scene,
@@ -324,7 +350,7 @@ export const generateStoryBase = async (
     - videoPromptKOR: 한국어 영상 지시문. 나레이션의 감정선에 맞춰 캐릭터의 행동과 시선 처리를 구체적으로 명시하세요. 또한 바람에 흔들리는 머리카락, 흘러가는 구름, 반짝이는 윤슬 등 동적인 요소를 반드시 포함하세요.
     - videoPromptENG: 생성형 비디오 AI용 영어 프롬프트. 위 한국어 영상 지시문을 번역 및 최적화하여 작성하세요. "Warm Documentary, Live Action Graphic" 키워드를 적절히 믹스하세요.
     - backgroundKOR: 장면의 분위기와 배경 설명
-    - narrationKOR: ${isMultiMode ? '캐릭터 간의 대화 (한국어)' : '나레이션 (한국어)'}. **[매우 중요] 1개 컷 당 공백 포함 450~600자 분량의 텍스트가 생성되어야 합니다. 각 씬은 반드시 [씬 번호] 형식으로 구분하여 작성하세요. 예시: [씬 1] 나레이션 내용... [씬 2] 나레이션 내용... ${isMultiMode ? `반드시 선택된 모든 캐릭터들(${charNames})이 서로 대화하는 형식으로 작성하고, 각 대사 앞에 이름을 붙이세요.` : "3인칭 관찰자 시점의 '미니 다큐멘터리 에세이' 스타일로 작성해주세요."}**
+    - narrationKOR: ${isMultiMode ? '캐릭터 간의 대화 (한국어)' : '나레이션 (한국어)'}. **[매우 중요] 씬당 나레이션 총량은 반드시 공백 포함 200~300자 이내로 작성하세요 (약 60~80초 분량). 대화형은 각 캐릭터가 1~2줄씩만 말하도록 엄격히 제한. 각 씬은 반드시 [씬 번호] 형식으로 구분. ${isMultiMode ? `반드시 선택된 모든 캐릭터들(${charNames})이 서로 대화하는 형식으로 작성하고, 각 대사 앞에 이름을 붙이세요.` : "3인칭 관찰자 시점의 '미니 다큐멘터리 에세이' 스타일로 작성해주세요."}**
     - narrationENG: ${isMultiMode ? 'Dialogue (English)' : 'Narration (English)'}
     - sfxKOR: 장면을 채우는 **'자연의 소리(바람, 물소리 등)와 미니멀한 BGM'**의 조화를 구체적으로 묘사하세요.
     - sfxENG: 효과음 영어 키워드 (Pixabay 검색용)
@@ -337,7 +363,7 @@ export const generateStoryBase = async (
       - season: '봄', '여름', '가을', '겨울' 중 하나
       - timeOfDay: '아침', '오후', '해질녘', '밤' 중 하나
       - vibes: 감성 키워드 배열 (예: ['따뜻한 다큐', '기록', '차분함'])
-      - estimatedDuration: 총 예상 러닝타임 (초 단위 정수, 약 900~1200초 권장)
+      - estimatedDuration: 총 예상 러닝타임 (초 단위 정수, 반드시 720~900초 이내. 즉 12~15분 이내로 제한)
     - scenes: 20개의 장면 객체 배열
   `;
 
@@ -443,7 +469,24 @@ export const generateImagePrompts = async (
     - 영상 지시문(KOR): ${scene.videoPromptKOR}
     - 영상 지시문(ENG - 핵심 스타일 및 캐릭터 정보 포함): ${scene.videoPromptENG}
 
-    이 장면에 대해 반드시 정확히 ${imageCount}개의 이미지 프롬프트를 생성하세요. ${imageCount}개보다 많거나 적으면 절대 안 됩니다. JSON 배열의 길이가 정확히 ${imageCount}여야 합니다. 권장 앵글 순서 (${imageCount}개 채울 것): Wide(전경) → 미들샷 → 클로즈업 → 인물 뒷모습 → 디테일 샷 → 분위기 컷(황혼·빛) 반드시 "${selectedStyle}" 스타일 키워드를 포함할 것.
+    이 장면에 대해 반드시 정확히 ${imageCount}개의 이미지 프롬프트를 생성하세요. ${imageCount}개보다 많거나 적으면 절대 안 됩니다. JSON 배열의 길이가 정확히 ${imageCount}여야 합니다.
+    
+    [컷 구성 원칙 - 최대 ${imageCount}컷, 반드시 다양하게]
+    권장 앵글 순서 (중복 금지):
+    컷 1: Wide/Establishing shot (장소 전경, 인물 20% 이하)
+    컷 2: Medium shot (인물+배경 균형, 40% 이하)
+    컷 3: Close-up 또는 Detail shot (인물 표정 or 소품 디테일)
+    컷 4: Over-the-shoulder 또는 POV shot
+    컷 5: Atmosphere/Mood shot (인물 없이 공간감, 빛, 질감)
+    컷 6~8: 위 5가지 유형 중 아직 안 쓴 것 우선 사용
+    
+    [절대 금지 - 중복 패턴]
+    - "두 사람이 나란히 걷는" 뒷모습 wide shot: 이 장면에서 최대 1번만 사용
+    - 동일한 앵글(와이드/미들/클로즈업)을 연속 2컷 이상 사용 금지
+    - 같은 피사체(예: 두 사람의 얼굴 클로즈업)를 연달아 2컷 이상 생성 금지
+    - 모든 컷에 인물을 넣지 말 것 - 분위기컷(공간, 질감, 빛)은 인물 없이
+
+    반드시 "${selectedStyle}" 스타일 키워드를 포함할 것.
     
     각 이미지는 같은 장소·시간대를 유지하면서 앵글과 피사체 거리감을 단계적으로 변화시켜 연속 시퀀스로 구성하세요.
     나레이션의 감성 흐름에 이미지의 시각적 흐름도 대응되어야 합니다.
