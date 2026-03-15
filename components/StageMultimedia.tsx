@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Scene, TravelTheme } from '../types';
 import { GoogleGenAI, Modality } from "@google/genai";
@@ -92,8 +91,6 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
     return () => window.removeEventListener('characterSelectionChanged', syncSpeakers);
   }, []);
 
-  // Note: Gemini TTS returns raw PCM. 
-  // We'll package it with a WAV header for compatibility but name it .mp3 as requested.
   const createWavHeader = (dataLength: number, sampleRate: number = 24000) => {
     const buffer = new ArrayBuffer(44);
     const view = new DataView(buffer);
@@ -132,7 +129,7 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
       const getVoiceIdForSpeaker = (name: string) => {
         try {
           const chars = JSON.parse(
-            sessionStorage.getItem('character_list') || '[]'
+            sessionStorage.getItem('character_list') || sessionStorage.getItem('characters') || '[]'
           )
           const selectedIds = JSON.parse(
             sessionStorage.getItem('selectedCharacterIds') || '[]'
@@ -146,7 +143,7 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
           )
           if (match) {
             return match.gender.toLowerCase() === 'female'
-              ? 'aoede' : 'charon'
+              ? speaker1.voiceId : speaker2.voiceId
           }
         } catch(e) {}
         return speaker1.voiceId
@@ -291,15 +288,11 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
     ) => {
       for (let i = 0; i < maxRetries; i++) {
         try {
-          const blob = await generateAudioBlob(
-            narration, sceneNum
-          )
+          const blob = await generateAudioBlob(narration, sceneNum)
           if (blob) return blob
         } catch(e: any) {
           if (e?.status === 429 && i < maxRetries - 1) {
-            await new Promise(r => 
-              setTimeout(r, 5000)
-            )
+            await new Promise(r => setTimeout(r, 5000))
           } else throw e
         }
       }
@@ -319,7 +312,6 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
       
       try {
         const audioBlob = await retryGenerateAudio(scene.narrationKOR, scene.number);
-        
         if (audioBlob) {
           zip.file(`Scene_${scene.number}_Narration.mp3`, audioBlob);
           successCount++;
@@ -342,14 +334,9 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
       const url = URL.createObjectURL(content);
       const a = document.createElement('a');
       a.href = url;
-      
       const rawTitle = theme?.title || '';
-      const cleanTitle = rawTitle
-        .replace(/[^a-zA-Z0-9가-힣]/g, '')
-        .slice(0, 20);
-      
-      const zipFileName = cleanTitle ? `${cleanTitle}_tts.zip` : 'MetaNomad_tts.zip';
-      a.download = zipFileName;
+      const cleanTitle = rawTitle.replace(/[^a-zA-Z0-9가-힣]/g, '').slice(0, 20);
+      a.download = cleanTitle ? `${cleanTitle}_tts.zip` : 'MetaNomad_tts.zip';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -378,24 +365,17 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
 
   return (
     <div className="flex flex-col lg:flex-row gap-8 animate-fadeIn">
-      {/* Main Content Area */}
       <div className="flex-1 space-y-8">
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <button 
-              onClick={onBack}
-              className="text-stone-500 hover:text-stone-800 flex items-center gap-1 mb-2 transition-colors"
-            >
+            <button onClick={onBack} className="text-stone-500 hover:text-stone-800 flex items-center gap-1 mb-2 transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
               이전단계
             </button>
             <h2 className="text-3xl font-bold text-stone-800 ghibli-title">멀티미디어 변환 및 준비</h2>
             <p className="text-stone-600">1인독백 & 2인대화 AI 음성 생성 및 효과음 에셋을 구성합니다.</p>
           </div>
-          <button 
-            onClick={() => { if (!isBatchLoading) onNext(); }}
-            className={`px-8 py-3 rounded-xl font-bold shadow-xl transition-all flex items-center gap-2 ${isBatchLoading ? 'bg-stone-400 text-stone-200 cursor-not-allowed shadow-none' : 'bg-stone-900 text-white hover:bg-stone-800'}`}
-          >
+          <button onClick={() => { if (!isBatchLoading) onNext(); }} className={`px-8 py-3 rounded-xl font-bold shadow-xl transition-all flex items-center gap-2 ${isBatchLoading ? 'bg-stone-400 text-stone-200 cursor-not-allowed shadow-none' : 'bg-stone-900 text-white hover:bg-stone-800'}`}>
             다음단계
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7-7 7" /></svg>
           </button>
@@ -403,16 +383,10 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
 
         <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
           <div className="flex border-b border-stone-200">
-            <button 
-              onClick={() => setActiveTab('tts')}
-              className={`flex-1 py-4 text-sm font-bold tracking-wider uppercase transition-colors ${activeTab === 'tts' ? 'text-amber-600 bg-amber-50/50 border-b-2 border-amber-600' : 'text-stone-400 hover:text-stone-600'}`}
-            >
+            <button onClick={() => setActiveTab('tts')} className={`flex-1 py-4 text-sm font-bold tracking-wider uppercase transition-colors ${activeTab === 'tts' ? 'text-amber-600 bg-amber-50/50 border-b-2 border-amber-600' : 'text-stone-400 hover:text-stone-600'}`}>
               TTS / 독백 & 대화 변환 (MP3)
             </button>
-            <button 
-              onClick={() => setActiveTab('sfx')}
-              className={`flex-1 py-4 text-sm font-bold tracking-wider uppercase transition-colors ${activeTab === 'sfx' ? 'text-amber-600 bg-amber-50/50 border-b-2 border-amber-600' : 'text-stone-400 hover:text-stone-600'}`}
-            >
+            <button onClick={() => setActiveTab('sfx')} className={`flex-1 py-4 text-sm font-bold tracking-wider uppercase transition-colors ${activeTab === 'sfx' ? 'text-amber-600 bg-amber-50/50 border-b-2 border-amber-600' : 'text-stone-400 hover:text-stone-600'}`}>
               SFX / Pixabay 효과음
             </button>
           </div>
@@ -420,41 +394,27 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
           <div className="p-8">
             {activeTab === 'tts' ? (
               <div className="space-y-6">
-                {/* Voice Selection UI */}
                 <div className="p-6 bg-stone-50 rounded-2xl border border-stone-100 space-y-6">
                   <div className="flex flex-col sm:flex-row gap-4">
-                    <button 
-                      onClick={() => setEditingSpeaker(1)}
-                      className={`flex-1 p-3 rounded-xl border text-left transition-all bg-white shadow-md ${editingSpeaker === 1 ? 'border-amber-500 ring-2 ring-amber-300' : 'border-amber-300 hover:border-amber-400'}`}
-                    >
+                    <button onClick={() => setEditingSpeaker(1)} className={`flex-1 p-3 rounded-xl border text-left transition-all bg-white shadow-md ${editingSpeaker === 1 ? 'border-amber-500 ring-2 ring-amber-300' : 'border-amber-300 hover:border-amber-400'}`}>
                       <div className="text-xs font-bold text-stone-400 mb-1">화자 1 (Speaker 1)</div>
                       <div className="font-bold text-stone-800">{speaker1.label}</div>
                       <div className="text-[10px] text-stone-500 mt-1 uppercase">{speaker1.gender}</div>
                     </button>
-                    <button 
-                      onClick={() => setEditingSpeaker(2)}
-                      className={`flex-1 p-3 rounded-xl border text-left transition-all bg-white shadow-md ${editingSpeaker === 2 ? 'border-amber-500 ring-2 ring-amber-300' : 'border-amber-300 hover:border-amber-400'}`}
-                    >
+                    <button onClick={() => setEditingSpeaker(2)} className={`flex-1 p-3 rounded-xl border text-left transition-all bg-white shadow-md ${editingSpeaker === 2 ? 'border-amber-500 ring-2 ring-amber-300' : 'border-amber-300 hover:border-amber-400'}`}>
                       <div className="text-xs font-bold text-stone-400 mb-1">화자 2 (Speaker 2)</div>
                       <div className="font-bold text-stone-800">{speaker2.label}</div>
                       <div className="text-[10px] text-stone-500 mt-1 uppercase">{speaker2.gender}</div>
                     </button>
                   </div>
-                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 h-64 overflow-y-auto custom-scrollbar pr-2">
                     <div className="space-y-3">
                       <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest sticky top-0 bg-stone-50 py-1">Male Voices</label>
                       <div className="flex flex-wrap gap-2">
                         {VOICE_PRESETS.male.map(p => {
-                          const isSelected = editingSpeaker === 1 
-                            ? speaker1.gender === 'male' && speaker1.label === p.label
-                            : speaker2.gender === 'male' && speaker2.label === p.label;
+                          const isSelected = editingSpeaker === 1 ? speaker1.gender === 'male' && speaker1.label === p.label : speaker2.gender === 'male' && speaker2.label === p.label;
                           return (
-                            <button
-                              key={p.label}
-                              onClick={() => handleVoiceSelect(p.id, p.label, 'male')}
-                              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${isSelected ? 'bg-stone-800 border-stone-800 text-white shadow-md' : 'bg-white border-stone-200 text-stone-600 hover:border-amber-400'}`}
-                            >
+                            <button key={p.label} onClick={() => handleVoiceSelect(p.id, p.label, 'male')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${isSelected ? 'bg-stone-800 border-stone-800 text-white shadow-md' : 'bg-white border-stone-200 text-stone-600 hover:border-amber-400'}`}>
                               {p.icon} {p.label}
                             </button>
                           );
@@ -465,15 +425,9 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
                       <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest sticky top-0 bg-stone-50 py-1">Female Voices</label>
                       <div className="flex flex-wrap gap-2">
                         {VOICE_PRESETS.female.map(p => {
-                          const isSelected = editingSpeaker === 1 
-                            ? speaker1.gender === 'female' && speaker1.label === p.label
-                            : speaker2.gender === 'female' && speaker2.label === p.label;
+                          const isSelected = editingSpeaker === 1 ? speaker1.gender === 'female' && speaker1.label === p.label : speaker2.gender === 'female' && speaker2.label === p.label;
                           return (
-                            <button
-                              key={p.label}
-                              onClick={() => handleVoiceSelect(p.id, p.label, 'female')}
-                              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${isSelected ? 'bg-amber-600 border-amber-600 text-white shadow-md' : 'bg-white border-stone-200 text-stone-600 hover:border-amber-400'}`}
-                            >
+                            <button key={p.label} onClick={() => handleVoiceSelect(p.id, p.label, 'female')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${isSelected ? 'bg-amber-600 border-amber-600 text-white shadow-md' : 'bg-white border-stone-200 text-stone-600 hover:border-amber-400'}`}>
                               {p.icon} {p.label}
                             </button>
                           );
@@ -495,12 +449,7 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <button 
-                          disabled={loadingItems[s.number]}
-                          onClick={() => handleDownloadAudio('narration', s.number)}
-                          className={`p-2 rounded-full transition-all ${loadingItems[s.number] ? 'text-stone-300 cursor-not-allowed' : 'text-stone-400 hover:text-amber-600 hover:bg-amber-50'}`}
-                          title="MP3 생성 및 다운로드"
-                        >
+                        <button disabled={loadingItems[s.number]} onClick={() => handleDownloadAudio('narration', s.number)} className={`p-2 rounded-full transition-all ${loadingItems[s.number] ? 'text-stone-300 cursor-not-allowed' : 'text-stone-400 hover:text-amber-600 hover:bg-amber-50'}`} title="MP3 생성 및 다운로드">
                           {loadingItems[s.number] ? (
                             <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                           ) : (
@@ -513,20 +462,12 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
                 </div>
 
                 <div className="pt-6 flex flex-col items-center gap-4">
-                  <button 
-                    disabled={isBatchLoading || scenes.length === 0}
-                    onClick={handleBatchDownloadZip}
-                    className={`px-10 py-4 text-white rounded-2xl font-black shadow-lg transition-all flex items-center gap-3 ${isBatchLoading || scenes.length === 0 ? 'bg-stone-400 cursor-not-allowed shadow-none' : 'bg-amber-600 shadow-amber-200 hover:bg-amber-700 hover:-translate-y-1'}`}
-                  >
+                  <button disabled={isBatchLoading || scenes.length === 0} onClick={handleBatchDownloadZip} className={`px-10 py-4 text-white rounded-2xl font-black shadow-lg transition-all flex items-center gap-3 ${isBatchLoading || scenes.length === 0 ? 'bg-stone-400 cursor-not-allowed shadow-none' : 'bg-amber-600 shadow-amber-200 hover:bg-amber-700 hover:-translate-y-1'}`}>
                     {isBatchLoading && <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
                     {isBatchLoading ? `생성 중... (${batchProgress.current}/${batchProgress.total})` : '전체 나레이션 MP3 일괄 추출 (ZIP 다운로드)'}
                   </button>
-                  
                   {isBatchLoading && (
-                    <button 
-                      onClick={handleCancelBatch}
-                      className="text-stone-500 hover:text-rose-600 text-sm font-bold transition-colors flex items-center gap-1"
-                    >
+                    <button onClick={handleCancelBatch} className="text-stone-500 hover:text-rose-600 text-sm font-bold transition-colors flex items-center gap-1">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                       일괄 추출 중단하기
                     </button>
@@ -546,7 +487,6 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
                     </div>
                   </div>
                 </div>
-
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 h-[400px] overflow-y-auto custom-scrollbar pr-2">
                   {scenes.length === 0 ? (
                     <div className="col-span-full py-20 text-center text-stone-400 italic">스토리보드에서 장면을 먼저 생성해주세요.</div>
@@ -558,22 +498,15 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
                         <p className="text-[9px] text-stone-400 italic leading-tight">{s.sfxENG}</p>
                       </div>
                       <div className="flex gap-1 justify-center">
-                        <button 
-                          onClick={() => openPixabay(s.sfxENG)}
-                          className="px-2 py-1 bg-stone-800 text-white rounded text-[9px] font-bold hover:bg-black transition-colors"
-                        >
+                        <button onClick={() => openPixabay(s.sfxENG)} className="px-2 py-1 bg-stone-800 text-white rounded text-[9px] font-bold hover:bg-black transition-colors">
                           Pixabay 검색
                         </button>
                       </div>
                     </div>
                   ))}
                 </div>
-
                 <div className="pt-6 flex justify-center">
-                  <button 
-                    onClick={handleDownloadSFXCSV}
-                    className="px-10 py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-200 hover:bg-emerald-700 hover:-translate-y-1 transition-all"
-                  >
+                  <button onClick={handleDownloadSFXCSV} className="px-10 py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-200 hover:bg-emerald-700 hover:-translate-y-1 transition-all">
                     효과음 MP3 번들 가이드 다운로드
                   </button>
                 </div>
@@ -583,33 +516,25 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
         </div>
       </div>
 
-      {/* Right Side Control Panel */}
       <aside className="lg:w-80 space-y-6">
         <div className="bg-white border border-stone-200 rounded-3xl p-6 shadow-sm sticky top-24 space-y-8">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1.5 h-6 bg-rose-600 rounded-full"></div>
             <h3 className="font-bold text-stone-800">워크플로우 관리</h3>
           </div>
-
           <div className="space-y-4">
             <p className="text-xs text-stone-500 leading-relaxed">
               작업 중 랙이 걸리거나 생성이 너무 오래 걸릴 경우 아래 버튼으로 현재 진행 중인 모든 AI 작업을 안전하게 중단할 수 있습니다.
             </p>
-            
-            <button 
-              onClick={handleCancelBatch}
-              disabled={!isBatchLoading}
-              className={`w-full py-4 rounded-2xl font-black text-sm transition-all border-2 ${isBatchLoading ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100 shadow-md animate-pulse' : 'bg-stone-50 border-stone-100 text-stone-300 cursor-not-allowed'}`}
-            >
+            <button onClick={handleCancelBatch} disabled={!isBatchLoading} className={`w-full py-4 rounded-2xl font-black text-sm transition-all border-2 ${isBatchLoading ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100 shadow-md animate-pulse' : 'bg-stone-50 border-stone-100 text-stone-300 cursor-not-allowed'}`}>
               일괄 추출 중단 (취소)
             </button>
-            
             <div className="pt-4 border-t border-stone-100 space-y-3">
-               <h4 className="text-[10px] font-black text-stone-400 uppercase tracking-widest">System Status</h4>
-               <div className="flex items-center gap-2">
-                 <div className={`w-2 h-2 rounded-full ${isBatchLoading ? 'bg-amber-500 animate-ping' : 'bg-emerald-500'}`}></div>
-                 <span className="text-[10px] font-bold text-stone-600 uppercase">{isBatchLoading ? 'Processing Batch' : 'System Ready'}</span>
-               </div>
+              <h4 className="text-[10px] font-black text-stone-400 uppercase tracking-widest">System Status</h4>
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${isBatchLoading ? 'bg-amber-500 animate-ping' : 'bg-emerald-500'}`}></div>
+                <span className="text-[10px] font-bold text-stone-600 uppercase">{isBatchLoading ? 'Processing Batch' : 'System Ready'}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -618,6 +543,4 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
   );
 };
 
-export default StageMultimedia; 
-
-
+export default StageMultimedia;
