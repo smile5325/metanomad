@@ -620,3 +620,4 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
 
 export default StageMultimedia;
 
+
