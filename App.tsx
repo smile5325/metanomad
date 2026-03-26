@@ -19,6 +19,7 @@ const App: React.FC = () => {
   const [anchorPrompt, setAnchorPrompt] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [loadingProgress, setLoadingProgress] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // ✏️ alert 제거 → UI 에러 배너
   const [characters, setCharacters] = useState<Character[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -118,6 +119,7 @@ const App: React.FC = () => {
       setStage(WorkflowStage.STORYBOARD);
     } catch (error: unknown) {
       // ✏️ Fix 6: any 제거 → unknown + instanceof 타입 narrowing
+      // ✏️ alert() 완전 제거 → setErrorMessage로 UI 에러 배너 표시
       const err = error instanceof Error ? error : new Error(String(error));
       console.error("Story generation failed or was cancelled:", err.message);
       if (
@@ -125,14 +127,14 @@ const App: React.FC = () => {
         err.message.includes("API_KEY_MISSING") ||
         err.message.includes("401")
       ) {
-        alert("API 키가 유효하지 않거나 할당량이 초과되었습니다.\n.env 파일의 VITE_CLAUDE_API_KEY를 확인해주세요.");
+        setErrorMessage("API 키가 유효하지 않거나 할당량이 초과되었습니다. VITE_CLAUDE_API_KEY를 확인해주세요.");
         if (window.aistudio) {
           await window.aistudio.openSelectKey();
         }
-      } else if (err.message.includes("씬 데이터가 비어")) {
-        alert("씬 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      } else if (err.message.includes("씬 데이터가 비어") || err.message.includes("씬 구조 생성")) {
+        setErrorMessage("씬 생성에 실패했습니다. 잠시 후 재시도 버튼을 눌러주세요.");
       } else {
-        alert("생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+        setErrorMessage("생성 중 오류가 발생했습니다. 잠시 후 재시도 버튼을 눌러주세요.");
       }
     } finally {
       setLoading(false);
@@ -156,7 +158,15 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar currentStage={stage} onLogoClick={resetProcess} onStageClick={setStage} />
-      
+
+      {/* ✏️ 에러 배너 — alert() 대체 */}
+      {errorMessage && (
+        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 flex items-center justify-between">
+          <span className="text-sm font-medium">⚠️ {errorMessage}</span>
+          <button onClick={() => setErrorMessage(null)} className="text-red-500 hover:text-red-700 ml-4 text-lg leading-none">✕</button>
+        </div>
+      )}
+
       <main className="flex-1 container mx-auto px-4 py-8 max-w-6xl relative">
         {loading && (
           <div className="fixed inset-0 bg-white/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center">

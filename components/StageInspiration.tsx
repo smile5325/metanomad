@@ -274,10 +274,9 @@ const StageInspiration: React.FC<Props> = ({ themes, usedThemeTitles, characters
     } catch (err: any) {
       console.error("AI 추천 실패:", err);
       setThemes(prevThemesRef.current);
-      // ✏️ 실제 에러 메시지 표시 (rate limit, 모델 오류 등 원인 파악용)
+      // ✏️ alert() 제거 → setErrorMsg로 UI에 표시
       const errMsg = err?.message || String(err);
       setErrorMsg(`테마 로드 실패: ${errMsg.slice(0, 120)}`);
-      alert(`테마 로드 실패\n\n${errMsg}`);
     } finally {
       setIsLoading(false);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);

@@ -763,9 +763,10 @@ export const generateStoryArc = async (
   } catch (e) {
     // ✏️ Fix 14: 에러 유형 구분 — API 키/인증 오류는 re-throw (App.tsx catch가 UI 처리)
     const err = e instanceof Error ? e : new Error(String(e));
+    // ✏️ 에러 메시지와 일치하도록 수정 ('씬 구조 생성에 실패했습니다' 포함)
     const isFatal = err.message.includes('API_KEY_MISSING')
       || err.message.includes('401')
-      || err.message.includes('씬 구조 생성 실패')
+      || err.message.includes('씬 구조 생성')   // '씬 구조 생성에 실패했습니다' 포함
       || err.message.includes('씬 데이터가 비어');
     if (isFatal) {
       console.error('generateStoryArc 치명적 에러 — re-throw:', err.message);
