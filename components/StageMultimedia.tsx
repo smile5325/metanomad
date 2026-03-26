@@ -46,7 +46,8 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
   const [isBatchLoading, setIsBatchLoading] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
   
-  const [speaker1, setSpeaker1] = useState({ gender: 'female', voiceId: 'aoede', label: '우아한' });
+  // ✏️ 기본 voice: 여성→kore(차분한), 남성→charon(신뢰감있는) — 사용자 요청 반영
+  const [speaker1, setSpeaker1] = useState({ gender: 'female', voiceId: 'kore', label: '차분한' });
   const [speaker2, setSpeaker2] = useState({ gender: 'male', voiceId: 'charon', label: '신뢰감있는' });
 
   const [editingSpeaker, setEditingSpeaker] = useState<1 | 2>(1);
@@ -82,17 +83,21 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
 
           if (selectedCharacters.length > 0) {
             const char1 = selectedCharacters[0];
-            // ✏️ Fix 3: gender undefined 시 TypeError 방지 — optional chaining + fallback
+            // ✏️ 성별 기반 voice 자동 분기: 여성→kore, 남성→charon
             const gender1 = ((char1.gender?.toLowerCase?.() || 'female') as 'male' | 'female');
-            const preset1 = VOICE_PRESETS[gender1][0];
-            
-            setSpeaker1({ gender: gender1, voiceId: preset1.id, label: preset1.label });
-            
+            const voice1 = gender1 === 'male'
+              ? { id: 'charon', label: '신뢰감있는' }
+              : { id: 'kore', label: '차분한' };
+            setSpeaker1({ gender: gender1, voiceId: voice1.id, label: voice1.label });
+
             const mode = sessionStorage.getItem('characterSelectionMode');
             if (mode === 'Multi' || selectedCharacters.length > 1) {
-              const gender2 = gender1 === 'male' ? 'female' : 'male';
-              const preset2 = VOICE_PRESETS[gender2][0];
-              setSpeaker2({ gender: gender2, voiceId: preset2.id, label: preset2.label });
+              const char2 = selectedCharacters[1];
+              const gender2 = ((char2?.gender?.toLowerCase?.() || (gender1 === 'male' ? 'female' : 'male')) as 'male' | 'female');
+              const voice2 = gender2 === 'male'
+                ? { id: 'charon', label: '신뢰감있는' }
+                : { id: 'kore', label: '차분한' };
+              setSpeaker2({ gender: gender2, voiceId: voice2.id, label: voice2.label });
             }
           }
         }
@@ -186,31 +191,40 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
       const voiceName = getVoice(speaker);
       console.log(`씬${sceneNum} 턴${i + 1}/${parsedTurns.length} [${speaker || '독백'}→${voiceName}]: ${content.substring(0, 25)}...`);
 
-      try {
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash-preview-tts", // ✏️ pro→flash (500 RPD)
-          contents: [{ parts: [{ text: content }] }],
-          config: {
-            responseModalities: [Modality.AUDIO],
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
-          },
-        });
+      // ✏️ Rate Limit 대응: 최대 3회 재시도 + 실패 시 2초 딜레이
+      let success = false;
+      for (let retry = 0; retry < 3; retry++) {
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash-preview-tts",
+            contents: [{ parts: [{ text: content }] }],
+            config: {
+              responseModalities: [Modality.AUDIO],
+              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+            },
+          });
 
-        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        if (base64Audio) {
-          const bin = atob(base64Audio);
-          const bytes = new Uint8Array(bin.length);
-          for (let k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
-          allPcmBytes.push(bytes);
-          console.log(`씬${sceneNum} 턴${i + 1}/${parsedTurns.length} ✅ 완료 (${content.length}자)`);
-        } else {
-          console.warn(`씬${sceneNum} 턴${i + 1}/${parsedTurns.length} ⚠️ 오디오 없음`);
+          const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+          if (base64Audio) {
+            const bin = atob(base64Audio);
+            const bytes = new Uint8Array(bin.length);
+            for (let k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
+            allPcmBytes.push(bytes);
+            console.log(`씬${sceneNum} 턴${i + 1}/${parsedTurns.length} ✅ 완료 (${content.length}자, retry:${retry})`);
+            success = true;
+            break;
+          } else {
+            console.warn(`씬${sceneNum} 턴${i + 1}/${parsedTurns.length} ⚠️ 오디오 없음 (retry:${retry})`);
+          }
+        } catch (e: any) {
+          console.error(`씬${sceneNum} 턴${i + 1}/${parsedTurns.length} ❌ 실패 (retry:${retry}):`, e?.message || e);
         }
-      } catch (e: any) {
-        console.error(`씬${sceneNum} 턴${i + 1}/${parsedTurns.length} ❌ 실패:`, e?.message || e);
+        // ✏️ 재시도 전 2초 대기 (Rate Limit 완화)
+        if (!success && retry < 2) await new Promise(r => setTimeout(r, 2000));
       }
+      if (!success) console.warn(`씬${sceneNum} 턴${i + 1} 3회 재시도 모두 실패 — 해당 턴 스킵`);
 
-      // ✏️ 턴간 7초 대기 — pro 모델 10RPM 기준 (3턴×7s=21s/씬, 씬간 12s → 총 4RPM 안전)
+      // ✏️ 턴간 7초 대기 (flash 모델 Rate Limit 안전 유지)
       if (i < parsedTurns.length - 1) await new Promise(r => setTimeout(r, 7000));
     }
 
