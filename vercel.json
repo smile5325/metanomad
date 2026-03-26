@@ -1,0 +1,14 @@
+{
+  "git": {
+    "deploymentEnabled": {
+      "main": true
+    }
+  },
+  "functions": {
+    "api/**": {
+      "maxDuration": 60
+    }
+  },
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist"
+}
