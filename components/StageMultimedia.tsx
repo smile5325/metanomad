@@ -142,12 +142,29 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
 
     // ✏️ 나레이션 형식 감지 → 화자 단위 배열 분리
     // 곡따옴표 정규화 후 Name:"text" 패턴 직접 추출
+    // ✏️ splitBySpeaker: / 분리 후 각 파트에서 Name: 패턴도 추출 (Noah voice 버그 수정)
     const splitBySpeaker = (fullText: string): string[] => {
       const t = fullText
         .replace(/[\u201C\u201D\u201E\u201F\u00AB\u00BB]/g, '"')
         .replace(/[\u2018\u2019\u201A\u201B]/g, "'");
-      if (t.includes(' / ')) return t.split(' / ').filter(p => p.trim());
-      if (t.includes('\n')) return t.split('\n').filter(p => p.trim());
+
+      // Name: 패턴 추출 헬퍼 — 따옴표 있어도 없어도 파싱
+      const extractNameContent = (part: string): string | null => {
+        const m = part.match(/^([가-힣A-Za-z0-9]+)\s*:\s*"?(.+?)"?\s*$/s);
+        return m ? `${m[1].trim()}|||${m[2].trim()}` : null;
+      };
+
+      if (t.includes(' / ')) {
+        // ✏️ / 분리 후 각 파트에서 Name: 패턴 추출 시도
+        return t.split(' / ')
+          .map(p => p.trim()).filter(Boolean)
+          .map(p => extractNameContent(p) || p);
+      }
+      if (t.includes('\n')) {
+        return t.split('\n')
+          .map(p => p.trim()).filter(Boolean)
+          .map(p => extractNameContent(p) || p);
+      }
       // Name: "text" 형식 직접 추출
       const turns: string[] = [];
       const re = /([가-힣A-Za-z0-9]+)\s*:\s*"([^"]+)"/g;

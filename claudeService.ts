@@ -117,11 +117,14 @@ async function callClaudeWithImage(
 function sanitizeJSON(text: string): string {
   let s = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
   s = s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  // ✏️ JSON 값 내 제어문자 이스케이프 + 이스케이프 안 된 큰따옴표 처리
   s = s.replace(/"((?:[^"\\]|\\.)*)"/g, (_match, inner) => {
     const fixed = inner
       .replace(/\n/g, '\\n')
       .replace(/\r/g, '\\r')
-      .replace(/\t/g, '\\t');
+      .replace(/\t/g, '\\t')
+      // ✏️ 이스케이프 안 된 내부 따옴표 → 제거 (대화 형식에서 Name: "대사" → Name: 대사)
+      .replace(/(?<!\\)"/g, '');
     return `"${fixed}"`;
   });
   return s;
@@ -428,7 +431,7 @@ export const generateNarration = async (
   const narrationRule = isMultiMode
     ? `2인 대화형 구성 규칙:
 - ${char1Name}과 ${char2Name}이 번갈아 대화하는 형식
-- 형식: ${char1Name}: "대사" / ${char2Name}: "대사"
+- ✏️ 형식: ${char1Name}: 대사 / ${char2Name}: 대사  ← 큰따옴표 절대 사용 금지 (JSON 파싱 오류 방지)
 - 각 대사 50~80자, 5~7회 교대
 - 목표 글자수: 반드시 530~580자 (실측 6.6자/초 × 80~88초 분량)`
     : `1인 3인칭 관찰자 나레이션 구성 규칙:
