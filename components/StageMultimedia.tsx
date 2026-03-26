@@ -67,11 +67,11 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
   useEffect(() => {
     const syncSpeakers = () => {
       try {
-        const storedChars = sessionStorage.getItem('character_list') || sessionStorage.getItem('characters');
-        const storedSelectedIds = sessionStorage.getItem('selectedCharacterIds');
-        
+        // ✏️ localStorage로 수정 — StageInspiration이 localStorage에 저장함 (sessionStorage 아님)
+        const storedChars = localStorage.getItem('character_list') || localStorage.getItem('characters');
+        const storedSelectedIds = localStorage.getItem('selectedCharacterIds');
+
         if (storedChars && storedSelectedIds) {
-          // ✏️ Fix 3: JSON.parse 각각 try-catch로 감싸 파싱 실패 시 빈 배열 폴백
           let allChars: any[] = [];
           let selectedIds: any[] = [];
           try { allChars = JSON.parse(storedChars); } catch { allChars = []; }
@@ -83,14 +83,15 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
 
           if (selectedCharacters.length > 0) {
             const char1 = selectedCharacters[0];
-            // ✏️ 성별 기반 voice 자동 분기: 여성→kore, 남성→charon
+            // ✏️ 성별 기반 voice 분기: 남성→charon, 여성→kore
             const gender1 = ((char1.gender?.toLowerCase?.() || 'female') as 'male' | 'female');
             const voice1 = gender1 === 'male'
               ? { id: 'charon', label: '신뢰감있는' }
               : { id: 'kore', label: '차분한' };
             setSpeaker1({ gender: gender1, voiceId: voice1.id, label: voice1.label });
+            console.log(`syncSpeakers: ${char1.name}(${gender1}) → ${voice1.id}`);
 
-            const mode = sessionStorage.getItem('characterSelectionMode');
+            const mode = localStorage.getItem('characterSelectionMode');
             if (mode === 'Multi' || selectedCharacters.length > 1) {
               const char2 = selectedCharacters[1];
               const gender2 = ((char2?.gender?.toLowerCase?.() || (gender1 === 'male' ? 'female' : 'male')) as 'male' | 'female');
@@ -98,6 +99,7 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
                 ? { id: 'charon', label: '신뢰감있는' }
                 : { id: 'kore', label: '차분한' };
               setSpeaker2({ gender: gender2, voiceId: voice2.id, label: voice2.label });
+              console.log(`syncSpeakers: ${char2?.name}(${gender2}) → ${voice2.id}`);
             }
           }
         }
@@ -218,9 +220,11 @@ const StageMultimedia: React.FC<Props> = ({ theme, scenes, onNext, onBack }) => 
           }
         } catch (e: any) {
           console.error(`씬${sceneNum} 턴${i + 1}/${parsedTurns.length} ❌ 실패 (retry:${retry}):`, e?.message || e);
+          // ✏️ 429 Rate Limit 에러 감지 → 5초 대기, 그 외 → 2초 대기
+          const is429 = String(e?.message || e).includes('429') || String(e?.message || e).toLowerCase().includes('rate');
+          const retryDelay = is429 ? 5000 : 2000;
+          if (retry < 2) await new Promise(r => setTimeout(r, retryDelay));
         }
-        // ✏️ 재시도 전 2초 대기 (Rate Limit 완화)
-        if (!success && retry < 2) await new Promise(r => setTimeout(r, 2000));
       }
       if (!success) console.warn(`씬${sceneNum} 턴${i + 1} 3회 재시도 모두 실패 — 해당 턴 스킵`);
 
